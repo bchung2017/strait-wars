@@ -1,0 +1,24 @@
+{
+  "name": "strait-wars",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Strait Wars — a low-poly naval defense game, split into a Vite frontend and an Express backend for deployment on Render.",
+  "type": "module",
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,green \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "npm --workspace server run dev",
+    "dev:client": "npm --workspace client run dev",
+    "build": "npm --workspace client run build",
+    "start": "npm --workspace server run start"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

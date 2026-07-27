@@ -1,0 +1,24 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# One web service: builds the Vite client and serves it (plus the leaderboard
+# API) from the Express backend.
+services:
+  - type: web
+    name: strait-wars
+    runtime: node
+    plan: free
+    # Install all workspaces and build the client into client/dist.
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20.11.1
+      # Persist the leaderboard on a disk mount. Attach a disk below and point
+      # SCORES_FILE at it; without a disk, scores reset on each deploy/restart.
+      - key: SCORES_FILE
+        value: /var/data/scores.json
+    # Uncomment to keep leaderboard scores across restarts (paid plans):
+    # disk:
+    #   name: strait-wars-data
+    #   mountPath: /var/data
+    #   sizeGB: 1
+    healthCheckPath: /api/health

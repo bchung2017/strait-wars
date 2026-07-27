@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Strait Wars — Low-Poly Naval Defense</title>
+<link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div class="bar" id="hpBar"><div class="barfill" id="hpFill"></div></div>
+  <div class="lbl" id="hpLbl">HULL</div>
+  <div id="ammo"></div>
+  <div id="stats"></div>
+</div>
+
+<div class="mbtn" id="btnInter">MISSILE</div>
+<div class="mbtn" id="btnDrone">DRONE</div>
+<div class="mbtn" id="btnReset">RESET</div>
+<div class="mbtn" id="btnLeft">&#9664;</div>
+<div class="mbtn" id="btnRight">&#9654;</div>
+
+<div class="overlay" id="start">
+  <h1>STRAIT WARS</h1>
+  <p>A frigate underway under siege. Steer to dodge naval mines while your turrets hold off swarming drones, missiles, and gun-boats.</p>
+  <div class="keys">
+    <b>&#9664; &#9654; buttons (or A / D / arrow keys)</b> steer the ship left, center, right to dodge naval mines<br>
+    <b>CRAM turrets fire automatically</b> — multiple rapid-fire guns lead and shred the nearest threats<br>
+    <b>Laser turrets fire automatically</b> — they pick and burn the nearest threat<br>
+    <b>MISSILE</b> button (or <b>1</b>) launches an interceptor at the nearest incoming missile<br>
+    <b>DRONE</b> button (or <b>2</b>) deploys an autonomous anti-drone drone<br>
+    <span class="hint">Your defenses are autonomous — you command the missiles and drones. RESET restarts anytime.</span>
+  </div>
+  <p class="hint">Tap or click to begin. Landscape recommended on mobile.</p>
+</div>
+
+<div class="overlay" id="over" style="display:none">
+  <h1>HULL BREACHED</h1>
+  <div class="go" id="overScore"></div>
+  <div class="lb" id="lbWrap">
+    <div class="lbTitle">TOP CAPTAINS</div>
+    <ol id="lbList" class="lbList"></ol>
+    <div class="lbForm">
+      <input id="lbName" maxlength="12" placeholder="CALL SIGN" autocomplete="off" spellcheck="false">
+      <button id="lbSubmit" type="button">LOG SCORE</button>
+    </div>
+    <div id="lbMsg" class="lbMsg"></div>
+  </div>
+  <p class="hint">Tap or click elsewhere to redeploy.</p>
+</div>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
