@@ -109,20 +109,32 @@ function addEnemy(type) {
   enemies.push(e);
 }
 
-const wave = { n: 0, queue: [], spawnT: 0, intermission: 3, between: true };
-function buildWave(n) {
-  const q = [];
-  const d = 18 + Math.floor(n * 6),
-    m = 3 + Math.floor(n * 2),
-    b = Math.floor(n * 0.5);
-  for (let i = 0; i < d; i++) q.push('drone');
-  for (let i = 0; i < m; i++) q.push('missile');
-  for (let i = 0; i < b; i++) q.push('boat');
-  for (let i = q.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [q[i], q[j]] = [q[j], q[i]];
-  }
-  return q;
+// Distance-based waves: each wave is a leg you must travel to survive. Every
+// wave is longer than the last. Enemies spawn continuously through the leg,
+// scaling up with the wave number.
+const wave = { n: 0, spawnT: 0, intermission: 3, between: true, traveled: 0, target: 0 };
+function waveTarget(n) {
+  return 900 + (n - 1) * 450;
+}
+function pickEnemyType(n) {
+  const wD = 18 + 6 * n,
+    wM = 3 + 2 * n,
+    wB = 0.5 * n;
+  const r = Math.random() * (wD + wM + wB);
+  return r < wD ? 'drone' : r < wD + wM ? 'missile' : 'boat';
+}
+function spawnInterval(n) {
+  return Math.max(0.3, rand(0.55, 0.95) - n * 0.04);
+}
+function maxAlive(n) {
+  return 12 + n * 3;
+}
+function startWave(n) {
+  wave.n = n;
+  wave.between = false;
+  wave.traveled = 0;
+  wave.target = waveTarget(n);
+  wave.spawnT = 0.4;
 }
 
 const dGeo = new THREE.TetrahedronGeometry(1.4, 0);
@@ -566,23 +578,20 @@ function damageShip(n) {
 function updateWaves(dt) {
   if (wave.between) {
     wave.spawnT -= dt;
-    if (wave.spawnT <= 0) {
-      wave.n++;
-      wave.queue = buildWave(wave.n);
-      wave.between = false;
-      wave.spawnT = 0;
-    }
+    if (wave.spawnT <= 0) startWave(wave.n + 1);
     return;
   }
-  if (wave.queue.length) {
-    wave.spawnT -= dt;
-    if (wave.spawnT <= 0) {
-      addEnemy(wave.queue.pop());
-      wave.spawnT = rand(0.07, 0.2);
-    }
-  } else if (enemies.length === 0) {
+  // advance along the leg; the wave clears once the full distance is travelled
+  wave.traveled += SHIP_SPEED * dt;
+  if (wave.traveled >= wave.target) {
     wave.between = true;
     wave.spawnT = wave.intermission;
+    return;
+  }
+  wave.spawnT -= dt;
+  if (wave.spawnT <= 0) {
+    if (enemies.length < maxAlive(wave.n)) addEnemy(pickEnemyType(wave.n));
+    wave.spawnT = spawnInterval(wave.n);
   }
 }
 function updateRegen(dt) {
@@ -706,13 +715,25 @@ function updateMines(dt, t) {
 // ---------- HUD ----------
 const hpFill = document.getElementById('hpFill'),
   ammoEl = document.getElementById('ammo'),
-  statsEl = document.getElementById('stats');
+  statsEl = document.getElementById('stats'),
+  distFill = document.getElementById('distFill'),
+  distLbl = document.getElementById('distLbl');
 function updateHUD() {
   hpFill.style.width = (P.hp / CFG.ship.hp) * 100 + '%';
   ammoEl.innerHTML =
     `<span class="k">[1]</span> Missiles <span class="${P.interAmmo < 2 ? 'lo' : ''}">${P.interAmmo}/${CFG.interceptor.max}</span><br>` +
     `<span class="k">[2]</span> Drones <span class="${P.droneAmmo < 1 ? 'lo' : ''}">${P.droneAmmo}/${CFG.drone.max}</span><br>` +
     `CRAM <span class="inf">AUTO</span> &nbsp; Lasers <span class="inf">AUTO</span>`;
+  // distance-to-go gauge: filled portion = how much farther this leg runs
+  if (wave.between) {
+    // before wave 1 the whole journey is ahead; between waves the leg is cleared
+    distFill.style.height = (wave.n > 0 ? 0 : 100) + '%';
+    distLbl.innerHTML = `NAV<br><b>${wave.n > 0 ? 'CLEAR' : 'START'}</b>`;
+  } else {
+    const remaining = Math.max(0, wave.target - wave.traveled);
+    distFill.style.height = clamp(remaining / wave.target, 0, 1) * 100 + '%';
+    distLbl.innerHTML = `NAV<br><b>${Math.ceil(remaining)}m</b>`;
+  }
   statsEl.innerHTML =
     `<b>${wave.between ? 'NEXT WAVE ' + Math.ceil(wave.spawnT) : 'WAVE ' + wave.n}</b><br>` +
     `Threats: ${enemies.length}<br>Score: ${P.score}`;
@@ -755,7 +776,8 @@ function restart() {
   shipX = 0;
   move.left = move.right = false;
   wave.n = 0;
-  wave.queue.length = 0;
+  wave.traveled = 0;
+  wave.target = 0;
   wave.between = true;
   wave.spawnT = wave.intermission;
 }
