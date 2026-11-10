@@ -31,4 +31,4 @@ export const LASER_MUZZLES = [V(-7, 13, -10), V(7, 13, -10)];
 
 export const LANE = 55;
 export const LANE_MAX = 74;
-export const LAT_SPEED = 100;
+export const LAT_SPEED = 200;

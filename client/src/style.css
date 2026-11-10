@@ -21,6 +21,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#bfe3f0;font-family:ui
 #btnInter{right:24px;bottom:120px;width:98px;height:98px;font-size:15px;border-color:#f1c40f}
 #btnDrone{right:130px;bottom:56px;width:74px;height:74px;border-color:#2ecc71}
 #btnReset{right:20px;top:16px;width:60px;height:60px;font-size:12px;border-color:#e74c3c;pointer-events:auto}
+#btnMute{right:90px;top:16px;width:60px;height:60px;font-size:24px;border-color:#9fd8e6;pointer-events:auto}
 #btnLeft{left:22px;bottom:70px;width:84px;height:84px;font-size:30px;border-color:#eaf6fb}
 #btnRight{left:116px;bottom:70px;width:84px;height:84px;font-size:30px;border-color:#eaf6fb}
 .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;background:rgba(10,28,40,.82);text-align:center;pointer-events:auto}

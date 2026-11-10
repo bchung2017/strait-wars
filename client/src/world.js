@@ -13,7 +13,8 @@ scene.fog = new THREE.Fog(SKY, 300, CFG.worldFog);
 
 // steep top-down perspective ("isometric" read, but real diverging rays so drag-aim works)
 export const camera = new THREE.PerspectiveCamera(48, 1, 0.5, 4000);
-const CAM_EYE = V(0, 660, 465);
+// pulled in closer than the prototype so everything reads much larger on screen
+export const CAM_EYE = V(0, 372, 258);
 camera.position.copy(CAM_EYE);
 camera.lookAt(0, 12, 0);
 

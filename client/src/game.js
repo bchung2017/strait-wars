@@ -2,18 +2,17 @@ import * as THREE from 'three';
 import {
   TAU,
   clamp,
+  lerp,
   rand,
   V,
   CFG,
   SHIP_POS,
   CRAM_MUZZLES,
   LASER_MUZZLES,
-  LANE,
-  LANE_MAX,
   LAT_SPEED,
 } from './config.js';
 import { M, flat } from './materials.js';
-import { scene, camera, renderer, waterMat, islands } from './world.js';
+import { scene, camera, renderer, waterMat, islands, CAM_EYE } from './world.js';
 import {
   makeShip,
   makeCramTurret,
@@ -24,6 +23,7 @@ import {
   makeMine,
 } from './factories.js';
 import { initLeaderboard, showLeaderboard } from './leaderboard.js';
+import { startMusic, toggleMute } from './audio.js';
 
 let shipX = 0;
 const move = { left: false, right: false };
@@ -46,6 +46,33 @@ const laserTurrets = LASER_MUZZLES.map((p) => {
   scene.add(beam);
   return { mesh, muzzle: p.clone(), base: p.clone(), beam };
 });
+
+// ---------- play bounds: ship spans the full visible width ----------
+const _groundPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0); // z = 0 (ship's line)
+const _edgeRay = new THREE.Ray();
+const _edgeHit = new THREE.Vector3();
+let playHalfWidth = 120;
+function recomputeBounds() {
+  camera.updateMatrixWorld();
+  const shipNdc = new THREE.Vector3(0, SHIP_POS.y, 0).project(camera);
+  const edge = new THREE.Vector3(1, shipNdc.y, 0.5).unproject(camera);
+  _edgeRay.origin.copy(CAM_EYE);
+  _edgeRay.direction.copy(edge.sub(CAM_EYE).normalize());
+  if (_edgeRay.intersectPlane(_groundPlane, _edgeHit)) {
+    playHalfWidth = Math.max(40, Math.abs(_edgeHit.x) - 16); // margin for ship half-width
+  }
+}
+addEventListener('resize', recomputeBounds);
+recomputeBounds();
+
+// ---------- screen shake ----------
+const SHAKE_DUR = 0.4;
+let shakeT = 0,
+  shakeMag = 0;
+function addShake(mag) {
+  shakeMag = Math.max(shakeMag, mag);
+  shakeT = SHAKE_DUR;
+}
 
 // ---------- entities ----------
 const enemies = [],
@@ -137,18 +164,46 @@ function startWave(n) {
   wave.spawnT = 0.4;
 }
 
-const dGeo = new THREE.TetrahedronGeometry(1.4, 0);
+const dGeo = new THREE.TetrahedronGeometry(2.2, 0);
+const flashGeo = new THREE.SphereGeometry(1, 12, 10);
+const flashes = [];
+function flash(pos, color, size) {
+  const m = new THREE.Mesh(
+    flashGeo,
+    new THREE.MeshBasicMaterial({ color: color || 0xffd060, transparent: true, opacity: 0.9, depthWrite: false })
+  );
+  m.position.copy(pos);
+  m.scale.setScalar(size * 0.3);
+  scene.add(m);
+  flashes.push({ m, life: 0.28, max: 0.28, size });
+}
+function updateFlashes(dt) {
+  for (let i = flashes.length - 1; i >= 0; i--) {
+    const f = flashes[i];
+    f.life -= dt;
+    const t = clamp(1 - f.life / f.max, 0, 1);
+    f.m.scale.setScalar(lerp(f.size * 0.3, f.size, t));
+    f.m.material.opacity = 0.9 * (1 - t);
+    if (f.life <= 0) {
+      scene.remove(f.m);
+      f.m.material.dispose();
+      flashes.splice(i, 1);
+    }
+  }
+}
 function boom(pos, color, count = 10, power = 60) {
+  flash(pos, color, 6 + power * 0.14); // bright blast at the point of contact
   for (let i = 0; i < count; i++) {
     const m = new THREE.Mesh(dGeo, color ? flat(color) : M.debris);
     m.position.copy(pos);
+    m.scale.setScalar(rand(1.2, 2.6)); // chunkier shards
     scene.add(m);
     const dir = V(rand(-1, 1), rand(-0.2, 1), rand(-1, 1)).normalize();
     debris.push({
       m,
-      vel: dir.multiplyScalar(rand(0.4, 1) * power),
+      vel: dir.multiplyScalar(rand(0.4, 1) * power * 1.3),
       spin: V(rand(-8, 8), rand(-8, 8), rand(-8, 8)),
-      life: rand(0.6, 1.2),
+      life: rand(0.6, 1.3),
     });
   }
 }
@@ -221,6 +276,10 @@ bindBtn('btnReset', () => {
   restart();
   P.alive = true;
 });
+bindBtn('btnMute', () => {
+  const m = toggleMute();
+  document.getElementById('btnMute').textContent = m ? '🔇' : '🔊';
+});
 
 // start / restart
 const startEl = document.getElementById('start'),
@@ -229,6 +288,7 @@ function startGame() {
   startEl.style.display = 'none';
   overEl.style.display = 'none';
   P.alive = true;
+  startMusic(); // kicks off on a user gesture (overlay click)
 }
 startEl.addEventListener('click', startGame);
 overEl.addEventListener('click', () => {
@@ -569,6 +629,7 @@ function updateDebris(dt) {
 function damageShip(n) {
   if (!P.alive) return;
   P.hp -= n;
+  addShake(clamp(3 + n * 0.35, 4, 13)); // any damage kicks the camera
   if (P.hp <= 0) {
     P.hp = 0;
     gameOver();
@@ -628,7 +689,7 @@ function updateMotion(dt, t) {
   if (P.alive) {
     if (move.left) shipX -= LAT_SPEED * dt;
     if (move.right) shipX += LAT_SPEED * dt;
-    shipX = clamp(shipX, -LANE_MAX, LANE_MAX);
+    shipX = clamp(shipX, -playHalfWidth, playHalfWidth);
   }
   SHIP_POS.x = shipX;
   const heave = Math.sin(t * 0.7) * 1.3,
@@ -683,8 +744,7 @@ function updateMines(dt, t) {
     mineT -= dt;
     if (mineT <= 0) {
       mineT = rand(CFG.mine.spawn[0], CFG.mine.spawn[1]);
-      const lane = [-LANE, 0, LANE][Math.floor(rand(0, 3))];
-      const x = lane + rand(-6, 6);
+      const x = rand(-playHalfWidth, playHalfWidth); // mines spread across the full width
       const g = makeMine();
       g.position.set(x, 0, -400);
       scene.add(g);
@@ -762,6 +822,14 @@ function restart() {
   debris.length = 0;
   [...tracers].forEach((t) => scene.remove(t.l));
   tracers.length = 0;
+  [...flashes].forEach((f) => {
+    scene.remove(f.m);
+    f.m.material.dispose();
+  });
+  flashes.length = 0;
+  shakeT = 0;
+  shakeMag = 0;
+  camera.position.copy(CAM_EYE);
   laserTurrets.forEach((l) => (l.beam.visible = false));
   Object.assign(P, {
     hp: CFG.ship.hp,
@@ -807,7 +875,22 @@ function loop(now) {
   }
   updateTracers(dt);
   updateDebris(dt);
+  updateFlashes(dt);
   updateHUD();
+  // screen shake (decays to the resting camera eye)
+  if (shakeT > 0) {
+    shakeT -= dt;
+    const k = Math.max(0, shakeT / SHAKE_DUR) * shakeMag;
+    camera.position.set(
+      CAM_EYE.x + rand(-1, 1) * k,
+      CAM_EYE.y + rand(-1, 1) * k,
+      CAM_EYE.z + rand(-1, 1) * k
+    );
+    if (shakeT <= 0) {
+      shakeMag = 0;
+      camera.position.copy(CAM_EYE);
+    }
+  }
   renderer.render(scene, camera);
 }
 
